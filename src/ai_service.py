@@ -12,17 +12,28 @@ load_dotenv()
 # Recupera a chave da API
 api_key = os.getenv("GEMINI_API_KEY")
 
-# Cria o cliente Gemini
-client = genai.Client(
-    api_key=api_key,
-    http_options=types.HttpOptions(
-        retry_options=types.HttpRetryOptions(attempts=1)
+
+def obter_cliente():
+    """Cria o cliente Gemini quando necessário."""
+
+    if not api_key:
+        raise ValueError(
+            "A chave GEMINI_API_KEY não foi encontrada. "
+            "Verifique a configuração do arquivo .env."
+        )
+
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(attempts=1)
+        )
     )
-)
 
 def testar_conexao():
     """Verifica a comunicação com o Gemini."""
 
+    client = obter_cliente()
+    
     resposta = client.models.generate_content(
         model="gemini-3.6-flash",
         contents="Responda apenas: Conexão com o SmartOps AI estabelecida!"
@@ -33,6 +44,8 @@ def testar_conexao():
 
 def analisar_incidente(descricao):
     """Analisa um incidente de TI utilizando inteligência artificial."""
+
+    client = obter_cliente()
 
     resposta = client.models.generate_content(
         model="gemini-3.6-flash",
@@ -106,4 +119,15 @@ def analisar_incidente(descricao):
         )
     )
 
-    return json.loads(resposta.text)
+    if not resposta.text:
+        raise ValueError(
+            "A IA retornou uma resposta vazia. Tente novamente."
+        )
+    
+    try:
+        return json.loads(resposta.text)
+    
+    except json.JSONDecodeError as erro:
+        raise ValueError(
+            "Não foi possível interpretar a resposta da IA."
+    ) from erro

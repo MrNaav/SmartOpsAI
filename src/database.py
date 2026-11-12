@@ -1,3 +1,4 @@
+from contextlib import closing
 
 import sqlite3
 import json
@@ -18,27 +19,25 @@ def criar_tabela():
     # Garante que a pasta data exista
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    # Conecta ao banco de dados
-    conexao = sqlite3.connect(DB_PATH)
+    # Garante o fechamento da conexão
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
 
-    cursor = conexao.cursor()
+        with conexao:
 
-    # Cria a tabela de incidentes
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS incidentes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            descricao TEXT NOT NULL,
-            categoria TEXT,
-            prioridade TEXT,
-            impacto TEXT,
-            causas TEXT,
-            recomendacoes TEXT,
-            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+            cursor = conexao.cursor()
 
-    conexao.commit()
-    conexao.close()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS incidentes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    descricao TEXT NOT NULL,
+                    categoria TEXT,
+                    prioridade TEXT,
+                    impacto TEXT,
+                    causas TEXT,
+                    recomendacoes TEXT,
+                    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
 
 
 
@@ -46,37 +45,37 @@ def salvar_incidente(descricao, categoria=None, prioridade=None,
                      impacto=None, causas=None, recomendacoes=None):
     """Salva um incidente no banco de dados."""
 
-    conexao = sqlite3.connect(DB_PATH)
-    cursor = conexao.cursor()
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
 
-    # Converte listas em JSON para armazenamento no SQLite
-    causas_json = json.dumps(causas, ensure_ascii=False) if causas else None
-    recomendacoes_json = json.dumps(recomendacoes, ensure_ascii=False) if recomendacoes else None
+        # Gerencia a transação: confirma ou desfaz em caso de erro
+        with conexao:
 
-    cursor.execute("""
-        INSERT INTO incidentes (
-            descricao,
-            categoria,
-            prioridade,
-            impacto,
-            causas,
-            recomendacoes
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (
-        descricao,
-        categoria,
-        prioridade,
-        impacto,
-        causas_json,
-        recomendacoes_json
-    ))
+            cursor = conexao.cursor()
 
-    conexao.commit()
+            # Converte listas em JSON para armazenamento no SQLite
+            causas_json = json.dumps(causas, ensure_ascii=False) if causas else None
+            recomendacoes_json = json.dumps(recomendacoes, ensure_ascii=False) if recomendacoes else None
 
-    incidente_id = cursor.lastrowid
+            cursor.execute("""
+                INSERT INTO incidentes (
+                    descricao,
+                    categoria,
+                    prioridade,
+                    impacto,
+                    causas,
+                    recomendacoes
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                descricao,
+                categoria,
+                prioridade,
+                impacto,
+                causas_json,
+                recomendacoes_json
+            ))
 
-    conexao.close()
+            incidente_id = cursor.lastrowid
 
     return incidente_id
 
@@ -84,19 +83,17 @@ def salvar_incidente(descricao, categoria=None, prioridade=None,
 def listar_incidentes():
     """Retorna todos os incidentes cadastrados, do mais recente ao mais antigo."""
 
-    conexao = sqlite3.connect(DB_PATH)
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
 
-    cursor = conexao.cursor()
+        cursor = conexao.cursor()
 
-    cursor.execute("""
-        SELECT *
-        FROM incidentes
-        ORDER BY data_criacao DESC, id DESC
-    """)
+        cursor.execute("""
+            SELECT *
+            FROM incidentes
+            ORDER BY data_criacao DESC, id DESC
+        """)
 
-    incidentes = cursor.fetchall()
-
-    conexao.close()
+        incidentes = cursor.fetchall()
 
     return incidentes
 
@@ -104,16 +101,14 @@ def listar_incidentes():
 def listar_incidentes_dataframe():
     """Retorna os incidentes em formato de DataFrame."""
 
-    conexao = sqlite3.connect(DB_PATH)
-
     consulta = """
         SELECT *
         FROM incidentes
         ORDER BY data_criacao DESC, id DESC
     """
 
-    df = pd.read_sql_query(consulta, conexao)
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
 
-    conexao.close()
+        df = pd.read_sql_query(consulta, conexao)
 
     return df

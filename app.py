@@ -64,6 +64,11 @@ if st.button("Analisar incidente"):
 
     if descricao.strip():
 
+        # Limpa a análise anterior antes de iniciar uma nova
+        st.session_state.analise_atual = None
+        st.session_state.descricao_analisada = ""
+        st.session_state.analise_salva = False
+
         try:
             with st.spinner("A inteligência artificial está analisando o incidente..."):
 
@@ -73,8 +78,14 @@ if st.button("Analisar incidente"):
                 st.session_state.descricao_analisada = descricao.strip()
                 st.session_state.analise_salva = False
 
-        except Exception as erro:
-            st.error(f"Erro ao analisar incidente: {erro}")
+        except ValueError as erro:
+            st.error(str(erro))
+
+        except Exception:
+            st.error(
+                "Não foi possível realizar a análise. "
+                "Verifique sua conexão, a chave da API e o limite de requisições."
+            )
 
     else:
         st.warning("Informe uma descrição antes de continuar.")
@@ -115,11 +126,11 @@ if (
             try:
                 incidente_id = salvar_incidente(
                     descricao=st.session_state.descricao_analisada,
-                    categoria=resultado["categoria"],
-                    prioridade=resultado["prioridade"],
-                    impacto=resultado["impacto"],
-                    causas=resultado["causas"],
-                    recomendacoes=resultado["recomendacoes"]
+                    categoria=st.session_state.analise_atual["categoria"],
+                    prioridade=st.session_state.analise_atual["prioridade"],
+                    impacto=st.session_state.analise_atual["impacto"],
+                    causas=st.session_state.analise_atual["causas"],
+                    recomendacoes=st.session_state.analise_atual["recomendacoes"]
                 )
 
                 st.session_state.analise_salva = True
@@ -128,8 +139,11 @@ if (
                     f"Incidente salvo com sucesso! ID: {incidente_id}"
                 )
 
-            except Exception as erro:
-                st.error(f"Erro ao salvar incidente: {erro}")
+            except Exception:
+                st.error(
+                    "Não foi possível salvar o incidente. "
+                    "Verifique a conexão com o banco de dados."
+                )
 
     else:
         st.success("Este incidente já foi salvo.")
