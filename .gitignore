@@ -1,0 +1,24 @@
+# Ambiente virtual
+.venv/
+venv/
+
+# Variáveis de ambiente e credenciais
+.env
+.env.*
+!.env.example
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+
+# Banco de dados local
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Configurações locais do Streamlit
+.streamlit/secrets.toml
+
+# Arquivos temporários
+*.log
+.DS_Store
