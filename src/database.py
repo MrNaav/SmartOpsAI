@@ -40,6 +40,22 @@ def criar_tabela():
             """)
 
 
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS incidentes_excluidos (
+                    id INTEGER,
+                    descricao TEXT NOT NULL,
+                    categoria TEXT,
+                    prioridade TEXT,
+                    impacto TEXT,
+                    causas TEXT,
+                    recomendacoes TEXT,
+                    data_criacao TIMESTAMP,
+                    data_exclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+
+
 
 def salvar_incidente(descricao, categoria=None, prioridade=None,
                      impacto=None, causas=None, recomendacoes=None):
@@ -109,6 +125,167 @@ def listar_incidentes_dataframe():
 
     with closing(sqlite3.connect(DB_PATH)) as conexao:
 
+        df = pd.read_sql_query(consulta, conexao)
+
+    return df
+
+
+
+def excluir_incidente(incidente_id):
+    """
+    Arquiva o incidente antes de excluí-lo do histórico principal.
+    """
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
+        with conexao:
+            cursor = conexao.cursor()
+
+            # Busca o incidente original
+            cursor.execute("""
+                SELECT
+                    id,
+                    descricao,
+                    categoria,
+                    prioridade,
+                    impacto,
+                    causas,
+                    recomendacoes,
+                    data_criacao
+                FROM incidentes
+                WHERE id = ?
+            """, (incidente_id,))
+
+            incidente = cursor.fetchone()
+
+            if incidente is None:
+                return False
+
+            # Preserva os dados na tabela de excluídos
+            cursor.execute("""
+                INSERT INTO incidentes_excluidos (
+                    id,
+                    descricao,
+                    categoria,
+                    prioridade,
+                    impacto,
+                    causas,
+                    recomendacoes,
+                    data_criacao
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, incidente)
+
+            # Remove da tabela principal
+            cursor.execute(
+                "DELETE FROM incidentes WHERE id = ?",
+                (incidente_id,)
+            )
+
+    return True
+
+
+
+def restaurar_incidente(incidente_id):
+    """
+    Restaura um incidente da lixeira para o histórico principal.
+    Preserva o ID e os dados originais.
+    """
+
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
+        with conexao:
+            cursor = conexao.cursor()
+
+            # Busca o incidente arquivado mais recentemente
+            cursor.execute("""
+                SELECT
+                    rowid,
+                    id,
+                    descricao,
+                    categoria,
+                    prioridade,
+                    impacto,
+                    causas,
+                    recomendacoes,
+                    data_criacao
+                FROM incidentes_excluidos
+                WHERE id = ?
+                ORDER BY data_exclusao DESC, rowid DESC
+                LIMIT 1
+            """, (incidente_id,))
+
+            incidente = cursor.fetchone()
+
+            if incidente is None:
+                return False
+
+            # Separa o identificador interno da lixeira
+            linha_lixeira = incidente[0]
+            dados_incidente = incidente[1:]
+
+            # Insere novamente no histórico principal
+            cursor.execute("""
+                INSERT INTO incidentes (
+                    id,
+                    descricao,
+                    categoria,
+                    prioridade,
+                    impacto,
+                    causas,
+                    recomendacoes,
+                    data_criacao
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, dados_incidente)
+
+            # Remove o registro restaurado da lixeira
+            cursor.execute("""
+                DELETE FROM incidentes_excluidos
+                WHERE rowid = ?
+            """, (linha_lixeira,))
+
+    return True
+
+
+
+def excluir_incidente_definitivamente(incidente_id):
+    """
+    Remove permanentemente um incidente da lixeira.
+    Essa operação não pode ser desfeita.
+    """
+
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
+        with conexao:
+            cursor = conexao.cursor()
+
+            cursor.execute("""
+                DELETE FROM incidentes_excluidos
+                WHERE id = ?
+            """, (incidente_id,))
+
+            excluido = cursor.rowcount > 0
+
+    return excluido
+
+
+
+def listar_incidentes_excluidos():
+    """Retorna os incidentes arquivados na lixeira."""
+
+    consulta = """
+        SELECT
+            id,
+            descricao,
+            categoria,
+            prioridade,
+            impacto,
+            causas,
+            recomendacoes,
+            data_criacao,
+            data_exclusao
+        FROM incidentes_excluidos
+        ORDER BY data_exclusao DESC, id DESC
+    """
+
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
         df = pd.read_sql_query(consulta, conexao)
 
     return df

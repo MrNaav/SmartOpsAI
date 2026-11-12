@@ -33,7 +33,7 @@ def testar_conexao():
     """Verifica a comunicação com o Gemini."""
 
     client = obter_cliente()
-    
+
     resposta = client.models.generate_content(
         model="gemini-3.6-flash",
         contents="Responda apenas: Conexão com o SmartOps AI estabelecida!"
@@ -119,15 +119,79 @@ def analisar_incidente(descricao):
         )
     )
 
-    if not resposta.text:
+
+    if not resposta.text or not resposta.text.strip():
         raise ValueError(
             "A IA retornou uma resposta vazia. Tente novamente."
         )
-    
+
     try:
-        return json.loads(resposta.text)
-    
+        resultado = json.loads(resposta.text)
+
     except json.JSONDecodeError as erro:
         raise ValueError(
             "Não foi possível interpretar a resposta da IA."
-    ) from erro
+        ) from erro
+
+
+    # Verifica se a resposta é um objeto JSON
+    if not isinstance(resultado, dict):
+        raise ValueError(
+            "A IA retornou um formato de resposta inválido."
+        )
+
+
+    # Verifica os campos obrigatórios
+    campos_obrigatorios = [
+        "categoria",
+        "prioridade",
+        "impacto",
+        "causas",
+        "recomendacoes"
+    ]
+
+    if not all(campo in resultado for campo in campos_obrigatorios):
+        raise ValueError(
+            "A IA retornou uma análise incompleta. Tente novamente."
+        )
+
+
+    # Verifica os valores permitidos
+    categorias_validas = [
+        "Infraestrutura",
+        "Banco de dados",
+        "Rede",
+        "Aplicação",
+        "Segurança",
+        "Hardware",
+        "Outro"
+    ]
+
+    prioridades_validas = [
+        "Baixa",
+        "Média",
+        "Alta",
+        "Crítica"
+    ]
+
+    if resultado["categoria"] not in categorias_validas:
+        raise ValueError("A IA retornou uma categoria inválida.")
+
+    if resultado["prioridade"] not in prioridades_validas:
+        raise ValueError("A IA retornou uma prioridade inválida.")
+
+
+    # Verifica os tipos dos demais campos
+    if not isinstance(resultado["impacto"], str):
+        raise ValueError("O impacto retornado pela IA é inválido.")
+
+    for campo in ["causas", "recomendacoes"]:
+        if (
+            not isinstance(resultado[campo], list)
+            or not all(isinstance(item, str) for item in resultado[campo])
+        ):
+            raise ValueError(
+                "A IA retornou causas ou recomendações em formato inválido."
+            )
+
+    return resultado

@@ -67,7 +67,7 @@ SmartOpsAI/
 ### 2. Clonar o repositório
 
 ```bash
-git clone URL_DO_REPOSITORIO
+git clone https://github.com/MrNaav/SmartOpsAI.git
 cd SmartOpsAI
 ```
 
