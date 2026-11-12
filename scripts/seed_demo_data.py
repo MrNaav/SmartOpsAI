@@ -1,6 +1,7 @@
 
 import json
 import sqlite3
+from contextlib import closing
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -167,44 +168,44 @@ def inserir_dados_demo():
         data = agora - timedelta(days=incidente["dias"])
         registros.append((incidente, data))
 
-    with sqlite3.connect(DB_PATH) as conexao:
+    with closing(sqlite3.connect(DB_PATH)) as conexao:
+        with conexao:
+            cursor = conexao.cursor()
 
-        cursor = conexao.cursor()
-
-        # Impede a inserção duplicada dos dados de demonstração
-        cursor.execute(
-            "SELECT COUNT(*) FROM incidentes WHERE descricao LIKE ?",
-            (MARCADOR_DEMO + "%",)
-        )
-
-        if cursor.fetchone()[0] > 0:
-            print("Os dados de demonstração já foram inseridos.")
-            return
-
-        for incidente, data in registros:
+            # Impede a inserção duplicada dos dados de demonstração
             cursor.execute(
-                """
-                INSERT INTO incidentes (
-                    descricao,
-                    categoria,
-                    prioridade,
-                    impacto,
-                    causas,
-                    recomendacoes,
-                    data_criacao
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    incidente["descricao"],
-                    incidente["categoria"],
-                    incidente["prioridade"],
-                    incidente["impacto"],
-                    json.dumps(incidente["causas"], ensure_ascii=False),
-                    json.dumps(incidente["recomendacoes"], ensure_ascii=False),
-                    data.strftime("%Y-%m-%d %H:%M:%S"),
-                )
+                "SELECT COUNT(*) FROM incidentes WHERE descricao LIKE ?",
+                (MARCADOR_DEMO + "%",)
             )
+
+            if cursor.fetchone()[0] > 0:
+                print("Os dados de demonstração já foram inseridos.")
+                return
+
+            for incidente, data in registros:
+                cursor.execute(
+                    """
+                    INSERT INTO incidentes (
+                        descricao,
+                        categoria,
+                        prioridade,
+                        impacto,
+                        causas,
+                        recomendacoes,
+                        data_criacao
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        incidente["descricao"],
+                        incidente["categoria"],
+                        incidente["prioridade"],
+                        incidente["impacto"],
+                        json.dumps(incidente["causas"], ensure_ascii=False),
+                        json.dumps(incidente["recomendacoes"], ensure_ascii=False),
+                        data.strftime("%Y-%m-%d %H:%M:%S"),
+                    )
+                )
 
     print(f"{len(registros)} incidentes fictícios inseridos com sucesso!")
 
